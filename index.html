@@ -7,15 +7,14 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   
   <style>
-    /* Font Eksklusif & Cinematic */
     @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Montserrat:wght@200;300;400&display=swap');
 
     :root {
-      --bg-color: #030303;
+      --bg-color: #050505;
       --gold: #d4af37;
-      --gold-light: #f9e596;
+      --gold-light: #fceea7;
       --text-main: #f0f0f0;
-      --glass-bg: rgba(20, 20, 20, 0.4);
+      --glass-bg: rgba(15, 15, 15, 0.4);
       --glass-border: rgba(212, 175, 55, 0.15);
     }
 
@@ -27,21 +26,50 @@
       color: var(--text-main);
       overflow: hidden;
       font-family: 'Cormorant Garamond', serif;
-      scroll-behavior: smooth;
     }
 
-    /* ================= CINEMATIC BACKGROUND ================= */
-    #canvas-container {
+    /* ================= BACKGROUND BOKEH CINEMATIC ================= */
+    #dark-bg {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      z-index: 0; pointer-events: none;
-      background: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000000 100%);
+      background: radial-gradient(circle at 50% 50%, #151515 0%, #000000 100%);
+      z-index: 0;
     }
 
-    /* Transisi Antar Layar (Cut to Black) */
+    /* Pembungkus Bokeh (Awalnya tersembunyi, muncul setelah countdown) */
+    #bokeh-bg {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 1; opacity: 0; pointer-events: none;
+      transition: opacity 3s ease-in-out; /* Transisi sangat halus */
+    }
+    #bokeh-bg.show { opacity: 1; }
+
+    /* Gaya Cahaya Blur & Bintang Kecil */
+    .bokeh-blob {
+      position: absolute; border-radius: 50%;
+      background: radial-gradient(circle, rgba(240, 210, 140, 0.15) 0%, rgba(240, 210, 140, 0) 70%);
+      filter: blur(25px); mix-blend-mode: screen;
+      animation: floatBlob infinite alternate ease-in-out;
+    }
+    .star-dust {
+      position: absolute; width: 2px; height: 2px;
+      background: rgba(255, 240, 200, 0.8); border-radius: 50%;
+      box-shadow: 0 0 6px rgba(255, 240, 200, 0.8);
+      animation: twinkle infinite alternate;
+    }
+
+    @keyframes floatBlob {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(40px, -40px) scale(1.3); }
+    }
+    @keyframes twinkle {
+      0% { opacity: 0.1; transform: scale(0.8); }
+      100% { opacity: 1; transform: scale(1.5); }
+    }
+
+    /* Layar Hitam Transisi Antar Scene */
     #cinematic-transition {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background-color: #000; z-index: 999;
-      opacity: 0; pointer-events: none;
+      background-color: #000; z-index: 999; opacity: 0; pointer-events: none;
       transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
@@ -51,150 +79,112 @@
       display: flex; flex-direction: column; justify-content: center; align-items: center;
       opacity: 0; visibility: hidden; z-index: 10;
       transition: opacity 1.5s cubic-bezier(0.25, 1, 0.5, 1), transform 1.5s cubic-bezier(0.25, 1, 0.5, 1);
-      transform: scale(1.05); /* Sedikit nge-zoom saat disembunyikan */
+      transform: scale(1.05);
     }
-    .scene.active { 
-      opacity: 1; visibility: visible; transform: scale(1); pointer-events: all; 
-    }
+    .scene.active { opacity: 1; visibility: visible; transform: scale(1); pointer-events: all; }
 
     /* ================= TYPOGRAPHY ================= */
     .subtitle {
       font-family: 'Montserrat', sans-serif; font-size: 11px; letter-spacing: 6px;
       color: var(--gold); text-transform: uppercase; margin-bottom: 15px;
-      opacity: 0; transform: translateY(20px);
+      opacity: 0; transform: translateY(20px); text-align: center;
     }
-    .title {
-      font-size: 5vw; min-font-size: 40px; margin: 0; line-height: 1.1;
-      font-weight: 300; text-align: center; color: var(--gold-light);
-      text-shadow: 0 0 30px rgba(212, 175, 55, 0.2);
-    }
+    
+    /* GAYA NAMA (Diperbaiki agar terang & jelas) */
     .title-cursive {
-      font-family: 'Cinzel Decorative', cursive; font-size: 6vw;
-      background: linear-gradient(45deg, #d4af37, #fff, #d4af37);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      font-family: 'Cinzel Decorative', serif; font-size: 10vw;
+      color: var(--gold-light); text-align: center;
+      text-shadow: 0 0 20px rgba(212, 175, 55, 0.6), 0 0 40px rgba(212, 175, 55, 0.2);
     }
-    .italic-text { font-style: italic; font-size: 1.2rem; color: #a0a0a0; margin-top: 20px; font-weight: 300; }
+    .italic-text { font-style: italic; font-size: 1.2rem; color: #b0b0b0; margin-top: 20px; font-weight: 300; text-align: center; }
 
-    /* Tombol Profesional */
+    /* Animasi per-huruf untuk nama */
+    .char { display: inline-block; opacity: 0; transform: translateY(25px); filter: blur(8px); transition: all 1.5s ease-out; }
+    .scene.active .char { opacity: 1; transform: translateY(0); filter: blur(0); }
+
+    /* Tombol */
     .btn-cinematic {
-      position: relative; overflow: hidden;
-      border: 1px solid var(--gold); background: transparent; color: var(--gold);
+      position: relative; overflow: hidden; border: 1px solid var(--gold); background: transparent; color: var(--gold);
       padding: 15px 35px; font-family: 'Montserrat', sans-serif; font-size: 10px;
       letter-spacing: 4px; text-transform: uppercase; cursor: pointer;
       margin-top: 40px; transition: all 0.5s ease; backdrop-filter: blur(5px);
     }
     .btn-cinematic::before {
       content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.2), transparent);
-      transition: left 0.5s ease;
+      background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.2), transparent); transition: left 0.5s ease;
     }
     .btn-cinematic:hover::before { left: 100%; }
-    .btn-cinematic:hover { background: rgba(212, 175, 55, 0.1); color: #fff; box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); }
+    .btn-cinematic:hover { background: rgba(212, 175, 55, 0.15); color: #fff; box-shadow: 0 0 20px rgba(212, 175, 55, 0.3); }
 
     /* ================= SCENE SPESIFIK ================= */
-    
-    /* SCENE 1: Intro */
     #scene-intro { cursor: pointer; }
-    .pulse-text { animation: pulseSlow 3s infinite alternate; font-family: 'Montserrat'; font-size: 10px; letter-spacing: 3px; position: absolute; bottom: 10%; color: #666; }
+    .pulse-text { animation: pulseSlow 3s infinite alternate; font-family: 'Montserrat'; font-size: 10px; letter-spacing: 3px; position: absolute; bottom: 10%; color: #888; }
     
-    /* SCENE 2: Countdown Cinematic */
     #countdown-text {
       font-size: 120px; font-family: 'Cinzel Decorative', serif; color: var(--gold-light);
-      text-shadow: 0 0 50px rgba(212, 175, 55, 0.5);
-      opacity: 0; transform: scale(1.5); filter: blur(10px);
+      text-shadow: 0 0 50px rgba(212, 175, 55, 0.5); opacity: 0; transform: scale(1.5); filter: blur(10px);
       transition: all 0.8s cubic-bezier(0.25, 1, 0.5, 1);
     }
     #countdown-text.pop { opacity: 1; transform: scale(1); filter: blur(0); }
 
-    /* SCENE 3: Name Split Reveal */
-    .char { display: inline-block; opacity: 0; transform: translateY(30px) rotateX(-45deg); filter: blur(5px); transition: all 1s cubic-bezier(0.25, 1, 0.5, 1); }
-    .scene.active .char { opacity: 1; transform: translateY(0) rotateX(0); filter: blur(0); }
-
-    /* SCENE 4: Elegant Grid */
     .grid-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
     .masonry {
       display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 85%; max-width: 500px;
-      margin-top: 30px; transform: rotate(-2deg); /* Sudut artistik sedikit miring */
+      margin-top: 30px; transform: rotate(-2deg);
     }
     .masonry img {
-      width: 100%; aspect-ratio: 4/5; object-fit: cover; border-radius: 4px;
-      filter: grayscale(100%) contrast(120%) brightness(0.8);
-      box-shadow: 0 15px 30px rgba(0,0,0,0.5);
-      transition: all 0.8s cubic-bezier(0.25, 1, 0.5, 1);
-      opacity: 0; transform: translateY(40px);
+      width: 100%; aspect-ratio: 4/5; object-fit: cover; border-radius: 4px; filter: grayscale(100%) brightness(0.8);
+      box-shadow: 0 15px 30px rgba(0,0,0,0.5); transition: all 0.8s ease; opacity: 0; transform: translateY(40px); cursor: pointer;
     }
     .scene.active .masonry img { opacity: 1; transform: translateY(0); }
-    .masonry img:hover { 
-      filter: grayscale(0%) contrast(100%) brightness(1); 
-      transform: scale(1.05) translateZ(20px); z-index: 5;
-      box-shadow: 0 20px 40px rgba(212, 175, 55, 0.3);
-    }
+    .masonry img:hover { filter: grayscale(0%) brightness(1); transform: scale(1.05); z-index: 5; box-shadow: 0 20px 40px rgba(212, 175, 55, 0.4); }
 
-    /* SCENE 5: Glassmorphism Slider */
     .glass-card {
       display: flex; flex-direction: row; width: 85%; max-width: 800px;
       background: var(--glass-bg); border: 1px solid var(--glass-border);
       backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-      padding: 30px; gap: 40px; margin-top: 30px; align-items: center;
-      border-radius: 12px; box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+      padding: 30px; gap: 40px; margin-top: 30px; align-items: center; border-radius: 12px; box-shadow: 0 30px 60px rgba(0,0,0,0.6);
       transform: translateY(30px); opacity: 0; transition: all 1s ease 0.5s;
     }
     .scene.active .glass-card { transform: translateY(0); opacity: 1; }
     
     .msg-img-wrapper { width: 45%; overflow: hidden; border-radius: 8px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
     .msg-img { width: 100%; aspect-ratio: 3/4; object-fit: cover; filter: brightness(0.9); transition: transform 1s ease; }
-    .msg-img:hover { transform: scale(1.05); filter: brightness(1); }
-    
     .msg-text-box { width: 55%; font-size: 1.3rem; line-height: 1.8; color: #e0e0e0; font-style: italic; position: relative; }
-    .msg-text-box::before { content: '"'; font-size: 60px; color: rgba(212, 175, 55, 0.2); position: absolute; top: -30px; left: -20px; font-family: serif; }
-
+    
     .slider-nav { margin-top: 40px; display: flex; align-items: center; gap: 20px; }
     .nav-btn {
       background: rgba(0,0,0,0.5); border: 1px solid var(--gold); border-radius: 50%; color: var(--gold);
-      width: 45px; height: 45px; cursor: pointer; transition: all 0.3s;
-      display: flex; justify-content: center; align-items: center;
+      width: 45px; height: 45px; cursor: pointer; transition: all 0.3s; display: flex; justify-content: center; align-items: center;
     }
     .nav-btn:hover { background: var(--gold); color: #000; transform: scale(1.1); }
     .dot-container { display: flex; gap: 10px; }
-    .dot { width: 8px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1); }
+    .dot { width: 8px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; transition: all 0.5s ease; }
     .dot.active { background: var(--gold); transform: scale(2); box-shadow: 0 0 10px var(--gold); }
 
-    @media (max-width: 768px) {
-      .glass-card { flex-direction: column; padding: 20px; gap: 20px; }
-      .msg-img-wrapper { width: 100%; aspect-ratio: 1/1; }
-      .msg-text-box { width: 100%; font-size: 1.1rem; text-align: center; }
-      .msg-text-box::before { left: 45%; top: -20px; }
-      .title-cursive { font-size: 12vw; }
-      .masonry { width: 95%; gap: 10px; transform: rotate(0); }
-    }
-
-    /* SCENE 6: Final Cinematic Heart */
     .heart-wrapper { position: relative; margin-top: 50px; cursor: pointer; }
-    .heart-icon {
-      font-size: 60px; color: transparent;
-      -webkit-text-stroke: 1px rgba(255,255,255,0.4);
-      transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
+    .heart-icon { font-size: 60px; color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.4); transition: all 0.8s ease; }
     .heart-wrapper::after {
       content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0;
       background: radial-gradient(circle, rgba(255, 77, 77, 0.4) 0%, transparent 70%);
       transform: translate(-50%, -50%); border-radius: 50%; z-index: -1; transition: all 0.8s;
     }
     .heart-wrapper:hover .heart-icon { transform: scale(1.1); -webkit-text-stroke: 1px var(--gold); }
-    
-    .heart-wrapper.clicked .heart-icon { 
-      color: #ff2a2a; -webkit-text-stroke: 0; 
-      text-shadow: 0 0 40px rgba(255, 42, 42, 0.8), 0 0 80px rgba(255, 42, 42, 0.4);
-      transform: scale(1.3);
-    }
+    .heart-wrapper.clicked .heart-icon { color: #ff2a2a; -webkit-text-stroke: 0; text-shadow: 0 0 40px rgba(255, 42, 42, 0.8); transform: scale(1.3); }
     .heart-wrapper.clicked::after { width: 200px; height: 200px; }
 
     .final-wishes { opacity: 0; transform: translateY(20px); transition: all 1.5s ease 1s; text-align: center; margin-top: 30px; }
     .final-wishes.show { opacity: 1; transform: translateY(0); }
 
-    /* Animasi Bawaan CSS */
+    @media (max-width: 768px) {
+      .glass-card { flex-direction: column; padding: 20px; gap: 20px; }
+      .msg-img-wrapper { width: 100%; aspect-ratio: 1/1; }
+      .msg-text-box { width: 100%; font-size: 1.1rem; text-align: center; }
+      .title-cursive { font-size: 15vw; }
+    }
+
     @keyframes pulseSlow { 0% { opacity: 0.3; } 100% { opacity: 1; } }
-    .animate-up { opacity: 0; transform: translateY(30px); transition: all 1.5s cubic-bezier(0.25, 1, 0.5, 1); }
+    .animate-up { opacity: 0; transform: translateY(30px); transition: all 1.5s ease; }
     .scene.active .animate-up { opacity: 1; transform: translateY(0); }
   </style>
 </head>
@@ -203,41 +193,43 @@
   <!-- Audio Cinematic -->
   <audio id="bgMusic" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" loop></audio>
 
-  <!-- Kanvas untuk Partikel Debu Cinematic (Diatur via JS) -->
-  <canvas id="canvas-container"></canvas>
+  <!-- Latar Belakang Dasar -->
+  <div id="dark-bg"></div>
+  
+  <!-- Latar Belakang Bokeh (Muncul Setelah Countdown) -->
+  <div id="bokeh-bg"></div>
 
-  <!-- Layar Hitam untuk Efek Transisi -->
+  <!-- Layar Transisi Hitam -->
   <div id="cinematic-transition"></div>
 
-  <!-- ================= SCENE 1: INTRO ================= -->
+  <!-- SCENE 1: INTRO -->
   <div id="scene-intro" class="scene active" onclick="startExperience()">
     <p class="subtitle animate-up" style="transition-delay: 0.5s;">You Are Cordially Invited</p>
-    <h1 class="title animate-up" style="transition-delay: 1s;">A Little Surprise</h1>
-    <h2 class="title title-cursive animate-up" style="font-size: 40px; margin-top: 10px; transition-delay: 1.5s;">Made With Love</h2>
+    <h1 class="title-cursive animate-up" style="font-size: 45px; transition-delay: 1s;">A Little Surprise</h1>
+    <h2 class="animate-up" style="font-family: 'Cormorant Garamond'; color: var(--gold); font-size: 28px; font-style: italic; font-weight: 300; transition-delay: 1.5s;">Made With Love</h2>
     <div class="pulse-text" style="transition-delay: 2.5s;">[ TOUCH TO BEGIN ]</div>
   </div>
 
-  <!-- ================= SCENE 2: COUNTDOWN ================= -->
+  <!-- SCENE 2: COUNTDOWN -->
   <div id="scene-countdown" class="scene">
     <p class="subtitle animate-up">Preparing the moment</p>
     <div id="countdown-text">3</div>
   </div>
 
-  <!-- ================= SCENE 3: NAMA ALMAHERA ================= -->
+  <!-- SCENE 3: NAMA ALMAHERA (FIXED) -->
   <div id="scene-name" class="scene">
     <p class="subtitle animate-up">Celebrating</p>
-    <!-- Efek Split Text untuk Almahera -->
-    <h1 class="title title-cursive" id="name-title" style="margin: 20px 0;"></h1>
+    <h1 class="title-cursive" id="name-title" style="margin: 20px 0;"></h1>
     <p class="italic-text animate-up" style="transition-delay: 1.5s;">Everything about you matters • This is for you</p>
     <button class="btn-cinematic animate-up" style="transition-delay: 2s;" onclick="changeScene('scene-grid')">Let It Begin</button>
   </div>
 
-  <!-- ================= SCENE 4: MEMORIES (GRID) ================= -->
+  <!-- SCENE 4: MEMORIES -->
   <div id="scene-grid" class="scene">
     <div class="grid-wrapper">
       <p class="subtitle animate-up">All About You</p>
       <div class="masonry">
-        <!-- Ganti 4 FOTO ini. Hover efeknya sangat elegan -->
+        <!-- FOTO GRID (4 Buah) -->
         <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&auto=format&fit=crop" style="transition-delay: 0.3s">
         <img src="https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=500&auto=format&fit=crop" style="transition-delay: 0.5s; transform: translateY(20px);">
         <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop" style="transition-delay: 0.7s">
@@ -247,17 +239,13 @@
     </div>
   </div>
 
-  <!-- ================= SCENE 5: GLASSMORPHISM SLIDER ================= -->
+  <!-- SCENE 5: SLIDER -->
   <div id="scene-slider" class="scene">
     <p class="subtitle animate-up">A Message Just For You</p>
-    
     <div class="glass-card">
-      <div class="msg-img-wrapper">
-        <img id="slider-img" class="msg-img" src="">
-      </div>
+      <div class="msg-img-wrapper"><img id="slider-img" class="msg-img" src=""></div>
       <div id="slider-text" class="msg-text-box"></div>
     </div>
-
     <div class="slider-nav animate-up" style="transition-delay: 1s;">
       <button class="nav-btn" onclick="navSlide(-1)">❮</button>
       <div class="dot-container">
@@ -267,109 +255,75 @@
       </div>
       <button class="nav-btn" onclick="navSlide(1)">❯</button>
     </div>
-    
     <button id="btn-to-final" class="btn-cinematic" style="display:none; position:absolute; bottom: 8%;" onclick="changeScene('scene-final')">Open Final Gift</button>
   </div>
 
-  <!-- ================= SCENE 6: FINAL (SLOW-MO CONFETTI) ================= -->
+  <!-- SCENE 6: FINAL CONFETTI -->
   <div id="scene-final" class="scene">
     <p class="subtitle animate-up" style="transition-delay: 0.5s;">Thank You For Being Here</p>
-    <h1 class="title title-cursive animate-up" style="transition-delay: 1s;">Happy Birthday<br>Almahera</h1>
-    
+    <h1 class="title-cursive animate-up" style="font-size: 50px; transition-delay: 1s; line-height: 1.3;">Happy Birthday<br>Almahera</h1>
     <div class="heart-wrapper animate-up" style="transition-delay: 2s;" id="heart-btn" onclick="triggerCinematicSurprise()">
       <div class="heart-icon">🤍</div>
     </div>
-
     <div class="final-wishes" id="final-content">
       <p class="italic-text">May your days be as beautiful as your heart.</p>
-      <button class="btn-cinematic" onclick="location.reload()" style="margin-top: 30px; font-size: 8px;">Replay The Memory</button>
     </div>
   </div>
 
-  <!-- ================= JAVASCRIPT LOGIC ================= -->
   <script>
-    // 1. GENERATOR PARTIKEL DEBU CINEMATIC (Depth of Field)
-    const canvas = document.getElementById('canvas-container');
-    const ctx = canvas.getContext('2d');
-    let width, height;
-    let particles = [];
-
-    function initParticles() {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-      particles = [];
-      for (let i = 0; i < 80; i++) {
-        particles.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
-          r: Math.random() * 2.5 + 0.5, // Ukuran random
-          d: Math.random() * 80, // Kepadatan
-          vx: (Math.random() - 0.5) * 0.5,
-          vy: (Math.random() - 0.5) * 0.5,
-          alpha: Math.random() * 0.5 + 0.1
-        });
-      }
-    }
-    
-    function drawParticles() {
-      ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "rgba(212, 175, 55, 0.8)";
-      ctx.beginPath();
-      for (let i = 0; i < particles.length; i++) {
-        let p = particles[i];
-        ctx.moveTo(p.x, p.y);
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2, true);
-        
-        // Pergerakan melayang
-        p.y += p.vy;
-        p.x += p.vx;
-        
-        // Memantul jika lewat batas
-        if(p.x > width || p.x < 0) p.vx *= -1;
-        if(p.y > height || p.y < 0) p.vy *= -1;
-      }
-      ctx.fill();
-      requestAnimationFrame(drawParticles);
-    }
-    
-    window.addEventListener('resize', initParticles);
-    initParticles(); drawParticles();
-
-    // 2. LOGIKA TRANSISI SCENE (Fade to Black effect)
-    const blackScreen = document.getElementById('cinematic-transition');
-
-    function changeScene(targetId, callback = null) {
-      // Fade out to black
-      blackScreen.style.opacity = '1';
+    // 1. GENERATOR LATAR BELAKANG BOKEH & BINTANG (JS)
+    function createBokehBackground() {
+      const container = document.getElementById('bokeh-bg');
       
+      // Buat cahaya blur besar (Bokeh)
+      for(let i = 0; i < 15; i++) {
+        let blob = document.createElement('div');
+        blob.className = 'bokeh-blob';
+        let size = Math.random() * 150 + 100; // Ukuran 100px - 250px
+        blob.style.width = size + 'px';
+        blob.style.height = size + 'px';
+        blob.style.left = Math.random() * 100 + 'vw';
+        blob.style.top = Math.random() * 100 + 'vh';
+        blob.style.animationDuration = (Math.random() * 15 + 10) + 's';
+        blob.style.animationDelay = (Math.random() * -10) + 's';
+        container.appendChild(blob);
+      }
+
+      // Buat bintang bintik kecil
+      for(let i = 0; i < 35; i++) {
+        let star = document.createElement('div');
+        star.className = 'star-dust';
+        star.style.left = Math.random() * 100 + 'vw';
+        star.style.top = Math.random() * 100 + 'vh';
+        star.style.animationDuration = (Math.random() * 3 + 2) + 's';
+        star.style.animationDelay = (Math.random() * -5) + 's';
+        container.appendChild(star);
+      }
+    }
+    createBokehBackground(); // Jalankan fungsi pembuat background
+
+    // 2. LOGIKA TRANSISI SCENE
+    const blackScreen = document.getElementById('cinematic-transition');
+    function changeScene(targetId, callback = null) {
+      blackScreen.style.opacity = '1';
       setTimeout(() => {
-        // Matikan semua scene
         document.querySelectorAll('.scene').forEach(scene => scene.classList.remove('active'));
-        
-        // Hidupkan scene tujuan
         document.getElementById(targetId).classList.add('active');
-        
-        // Panggil fungsi khusus (jika ada) saat layar masih hitam
         if(callback) callback();
         if(targetId === 'scene-slider') renderSlide();
-
-        // Fade in back to screen
         setTimeout(() => { blackScreen.style.opacity = '0'; }, 300);
-      }, 1000); // Durasi layar hitam
+      }, 1000);
     }
 
-    // 3. MULAI PENGALAMAN & COUNTDOWN CINEMATIC
+    // 3. MULAI PENGALAMAN & COUNTDOWN
     function startExperience() {
-      // Coba Play Audio
-      document.getElementById('bgMusic').play().catch(e => console.log("Audio terblokir sistem"));
+      document.getElementById('bgMusic').play().catch(e => console.log("Audio terblokir"));
       
       changeScene('scene-countdown', () => {
         const countText = document.getElementById('countdown-text');
         let count = 3;
-        
         const countInterval = setInterval(() => {
           countText.classList.remove('pop');
-          
           setTimeout(() => {
             count--;
             if (count > 0) {
@@ -377,44 +331,38 @@
               countText.classList.add('pop');
             } else {
               clearInterval(countInterval);
-              // Jalankan split text animasi untuk nama Almahera
+              
+              // >>> INI KUNCI UTAMANYA: MUNCULKAN BOKEH SETELAH COUNTDOWN <<<
+              document.getElementById('bokeh-bg').classList.add('show');
+              
               setupNameAnimation();
               changeScene('scene-name');
             }
-          }, 400); // Jeda text hilang sebelum ganti angka
+          }, 400);
         }, 1200);
       });
     }
 
-    // 4. ANIMASI TEKS SPLIT UNTUK "ALMAHERA"
+    // 4. ANIMASI NAMA SPLIT (DIJAMIN MUNCUL & TERANG)
     function setupNameAnimation() {
       const name = "Almahera";
       const titleEl = document.getElementById('name-title');
-      titleEl.innerHTML = ''; // bersihkan dulu
+      titleEl.innerHTML = ''; 
       
       name.split('').forEach((char, i) => {
         let span = document.createElement('span');
         span.innerText = char;
         span.className = 'char';
-        span.style.transitionDelay = `${(i * 0.1) + 0.5}s`; // Muncul berurutan
+        span.style.transitionDelay = `${(i * 0.15) + 0.5}s`; 
         titleEl.appendChild(span);
       });
     }
 
-    // 5. SLIDER DATA & LOGIKA
+    // 5. SLIDER DATA
     const slidesData = [
-      {
-        img: "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?w=600&auto=format&fit=crop",
-        text: "Di antara semua hal yang terjadi dalam hidupku, kamu adalah bagian yang paling ingin selalu aku jaga. Kehadiranmu membawa warna baru yang tak pernah aku sangka sebelumnya."
-      },
-      {
-        img: "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&auto=format&fit=crop",
-        text: "Senyummu adalah bentuk ketenangan paling indah. Selamat merayakan hari kelahiranmu. Semoga semesta selalu memelukmu dengan hal-hal baik."
-      },
-      {
-        img: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=600&auto=format&fit=crop",
-        text: "Aku berdoa agar segala mimpimu menemukan jalannya. Mari rayakan lebih banyak waktu, tawa, dan cerita di masa depan. I love you, Almahera."
-      }
+      { img: "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?w=600&auto=format&fit=crop", text: "Di antara semua hal yang terjadi dalam hidupku, kamu adalah bagian yang paling ingin selalu aku jaga. Kehadiranmu membawa warna baru yang tak pernah aku sangka sebelumnya." },
+      { img: "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&auto=format&fit=crop", text: "Senyummu adalah bentuk ketenangan paling indah. Selamat merayakan hari kelahiranmu. Semoga semesta selalu memelukmu dengan hal-hal baik." },
+      { img: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=600&auto=format&fit=crop", text: "Aku berdoa agar segala mimpimu menemukan jalannya. Mari rayakan lebih banyak waktu, tawa, dan cerita di masa depan. I love you, Almahera." }
     ];
 
     let currentSlide = 0;
@@ -422,18 +370,12 @@
     const sliderText = document.getElementById('slider-text');
 
     function renderSlide() {
-      // Efek transisi halus saat ganti isi slider
-      sliderImg.style.opacity = 0;
-      sliderText.style.opacity = 0;
-      
+      sliderImg.style.opacity = 0; sliderText.style.opacity = 0;
       setTimeout(() => {
         sliderImg.src = slidesData[currentSlide].img;
         sliderText.innerText = slidesData[currentSlide].text;
-        
-        sliderImg.style.opacity = 1;
-        sliderText.style.opacity = 1;
-        sliderImg.style.transition = 'opacity 0.8s';
-        sliderText.style.transition = 'opacity 0.8s';
+        sliderImg.style.opacity = 1; sliderText.style.opacity = 1;
+        sliderImg.style.transition = 'opacity 0.8s'; sliderText.style.transition = 'opacity 0.8s';
       }, 400);
 
       document.querySelectorAll('.dot').forEach((dot, index) => {
@@ -443,18 +385,17 @@
       const btnFinal = document.getElementById('btn-to-final');
       if (currentSlide === slidesData.length - 1) {
         btnFinal.style.display = 'block';
-        setTimeout(()=> btnFinal.classList.add('active'), 100);
       }
     }
 
     function navSlide(direction) {
       currentSlide += direction;
-      if (currentSlide < 0) currentSlide = slidesData.length - 1; // Looping
+      if (currentSlide < 0) currentSlide = slidesData.length - 1;
       if (currentSlide >= slidesData.length) currentSlide = 0;
       renderSlide();
     }
 
-    // 6. FINAL SLOW-MO CONFETTI SURPRISE
+    // 6. FINAL SLOW-MO CONFETTI
     function triggerCinematicSurprise() {
       const heartWrapper = document.getElementById('heart-btn');
       if (heartWrapper.classList.contains('clicked')) return; 
@@ -462,23 +403,16 @@
       heartWrapper.classList.add('clicked');
       document.getElementById('final-content').classList.add('show');
 
-      // Pengaturan Confetti Sinematik (Lambat & Elegan)
-      const duration = 5000; // 5 detik
+      const duration = 5000; 
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 100, zIndex: 100, colors: ['#d4af37', '#ffffff', '#ff4d4d'] };
-
       function randomInRange(min, max) { return Math.random() * (max - min) + min; }
 
       const interval = setInterval(function() {
         const timeLeft = animationEnd - Date.now();
-
         if (timeLeft <= 0) { return clearInterval(interval); }
-
         const particleCount = 20 * (timeLeft / duration);
-        confetti(Object.assign({}, defaults, { particleCount,
-          origin: { x: randomInRange(0.1, 0.9), y: Math.random() - 0.2 },
-          gravity: 0.4, scalar: 1.2, drift: randomInRange(-0.5, 0.5)
-        }));
+        confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.9), y: Math.random() - 0.2 }, gravity: 0.4, scalar: 1.2, drift: randomInRange(-0.5, 0.5) }));
       }, 250);
     }
   </script>
